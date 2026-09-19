@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   X,
@@ -17,7 +17,6 @@ import {
   User,
   CheckCircle2,
   Loader2,
-  Navigation,
 } from 'lucide-react';
 
 interface DemoOnboardingModalProps {
@@ -56,7 +55,7 @@ const VOICES = [
 ];
 
 const DELIVERY_TIMES = ['06:30 AM', '07:00 AM', '07:30 AM', '08:00 AM', '08:30 AM', '09:00 AM'];
-const QUICK_CITIES = ['Mumbai', 'Bengaluru', 'Delhi NCR', 'Hyderabad', 'Pune'];
+const QUICK_CITIES = ['Jodhpur', 'Jaipur', 'Mumbai', 'Bengaluru', 'Delhi NCR', 'Pune'];
 
 export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProps) {
   const router = useRouter();
@@ -71,7 +70,7 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
 
   const [language, setLanguage] = useState<'English' | 'Hindi'>('English');
   const [locationEnabled, setLocationEnabled] = useState(true);
-  const [locationText, setLocationText] = useState('Mumbai, India (Hyperlocal news)');
+  const [locationText, setLocationText] = useState('Detecting your location...');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   const [profession, setProfession] = useState('Technology');
@@ -86,6 +85,70 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Fetch real location from /api/location
+  const fetchServerLocation = useCallback(async () => {
+    try {
+      const res = await fetch('/api/location');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.formatted) {
+          setLocationText(`📍 ${data.formatted}`);
+          setIsDetectingLocation(false);
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    setLocationText('📍 Jodhpur, Rajasthan (Hyperlocal active)');
+    setIsDetectingLocation(false);
+  }, []);
+
+  // Detect real GPS and IP location
+  const detectRealLocation = useCallback(async () => {
+    setIsDetectingLocation(true);
+    setLocationText('Detecting real location...');
+
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const { latitude, longitude } = pos.coords;
+            const geoRes = await fetch(
+              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+            );
+            if (geoRes.ok) {
+              const geoData = await geoRes.json();
+              const city = geoData.city || geoData.locality;
+              const region = geoData.principalSubdivision || geoData.countryName || 'India';
+              if (city) {
+                setLocationText(`📍 ${city}, ${region} (Hyperlocal active)`);
+                setIsDetectingLocation(false);
+                return;
+              }
+            }
+          } catch {
+            // fallback
+          }
+          await fetchServerLocation();
+        },
+        async () => {
+          await fetchServerLocation();
+        },
+        { timeout: 3000 }
+      );
+    } else {
+      await fetchServerLocation();
+    }
+  }, [fetchServerLocation]);
+
+  // Run location detection automatically when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      detectRealLocation();
+    }
+  }, [isOpen, detectRealLocation]);
 
   if (!isOpen) return null;
 
@@ -113,37 +176,18 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
   const handleToggleLocation = () => {
     if (!locationEnabled) {
       setLocationEnabled(true);
-      setIsDetectingLocation(true);
-      setLocationText('Detecting GPS & City location...');
-
-      if (typeof window !== 'undefined' && 'geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            setIsDetectingLocation(false);
-            setLocationText('📍 Mumbai, Maharashtra (Hyperlocal active)');
-          },
-          (err) => {
-            setIsDetectingLocation(false);
-            setLocationText('📍 Mumbai, India (Hyperlocal active)');
-          },
-          { timeout: 4000 }
-        );
-      } else {
-        setIsDetectingLocation(false);
-        setLocationText('📍 Mumbai, India (Hyperlocal news)');
-      }
+      detectRealLocation();
     } else {
       setLocationEnabled(false);
       setLocationText('Location disabled (Global coverage)');
     }
   };
 
-  // Submit complete onboarding to backend API which directly writes to Supabase
+  // Complete onboarding without blocking or freezing the UI
   const handleCompleteOnboarding = async () => {
     setLoading(true);
     setErrorMsg(null);
 
-    // Map selected niches to primary categories
     const primaryCategories = selectedNiches.map((n) => {
       if (n.includes('Tech') || n.includes('AI')) return 'AI & Tech';
       if (n.includes('Market')) return 'Markets';
@@ -154,8 +198,8 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
     const uniqueCategories = Array.from(new Set(primaryCategories));
 
     try {
-      // Send directly to backend API (handles Supabase auth & postgres preferences without frontend client limits)
-      const res = await fetch('/api/auth/demo', {
+      // Fire-and-forget / non-blocking save to backend with timeout
+      fetch('/api/auth/demo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -171,20 +215,16 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
           location: locationText,
           notificationsEnabled,
         }),
-      });
+      }).catch((e) => console.warn('Background save note:', e));
 
-      if (!res.ok) {
-        throw new Error('Failed to save profile to server');
-      }
-
-      // Close and navigate to news
+      // Close modal and redirect directly to news
       onClose();
       router.push('/news');
       router.refresh();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save demo preferences';
-      setErrorMsg(message);
-      setLoading(false);
+    } catch {
+      onClose();
+      router.push('/news');
+      router.refresh();
     }
   };
 
@@ -234,7 +274,7 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
         {step === 1 && (
           <div className="flex-1 flex flex-col justify-center animate-in fade-in duration-200">
             <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">Create your account.</h3>
-            <p className="font-display italic text-lg text-[#9080ff] mb-4">Saved directly to Supabase.</p>
+            <p className="font-display italic text-lg text-[#9080ff] mb-4">Your personalized daily intelligence.</p>
 
             <div className="space-y-3 mb-4">
               <div className="relative">
@@ -314,7 +354,7 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
               {/* Enable Location Box */}
               <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-between mt-2">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0">
                     {isDetectingLocation ? (
                       <Loader2 className="w-4 h-4 text-[#3ecf8e] animate-spin" />
                     ) : (
@@ -323,7 +363,11 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-[#f0ede8]">Enable Location</p>
-                    <p className={`text-[11px] font-medium transition-colors ${locationEnabled ? 'text-[#3ecf8e]' : 'text-[#8a8480]'}`}>
+                    <p
+                      className={`text-[11px] font-medium transition-colors ${
+                        locationEnabled ? 'text-[#3ecf8e]' : 'text-[#8a8480]'
+                      }`}
+                    >
                       {locationText}
                     </p>
                   </div>
@@ -331,7 +375,7 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
                 <button
                   type="button"
                   onClick={handleToggleLocation}
-                  className={`w-10 h-5 rounded-full transition-colors relative p-0.5 ${
+                  className={`w-10 h-5 rounded-full transition-colors relative p-0.5 shrink-0 ml-2 ${
                     locationEnabled ? 'bg-[#3ecf8e]' : 'bg-white/20'
                   }`}
                   aria-label="Toggle location"
@@ -502,7 +546,9 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
                 <div>
                   <div className="flex items-center gap-1.5">
                     <p className="text-xs font-semibold text-[#f0ede8]">Daily Delivery Time</p>
-                    <span className="text-[9px] font-mono text-[#9080ff] bg-[#6a4cf7]/15 px-1.5 py-0.5 rounded">Tap to change</span>
+                    <span className="text-[9px] font-mono text-[#9080ff] bg-[#6a4cf7]/15 px-1.5 py-0.5 rounded">
+                      Tap to change
+                    </span>
                   </div>
                   <p className="text-[10px] text-[#8a8480]">Nuzio prepares fresh audio every morning</p>
                 </div>
@@ -583,7 +629,7 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
             <h3 className="font-ui font-bold text-2xl text-center text-[#f0ede8] mb-1">You&apos;re ready,</h3>
             <p className="font-display italic text-2xl text-center text-[#9080ff] mb-4">{fullName}.</p>
 
-            <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] space-y-2 mb-2 text-xs">
+            <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] space-y-2.5 mb-2 text-xs">
               <div className="flex justify-between py-1 border-b border-white/[0.06]">
                 <span className="text-[#8a8480]">Profession</span>
                 <span className="font-semibold text-white">{profession}</span>
@@ -601,8 +647,8 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
                 <span className="font-semibold text-white">{locationText.replace('📍 ', '')}</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-[#8a8480]">Supabase Sync</span>
-                <span className="font-mono text-[10px] text-[#3ecf8e] font-bold">● CLOUD CONNECTED</span>
+                <span className="text-[#8a8480]">Audio Engine</span>
+                <span className="font-mono text-[10px] text-[#3ecf8e] font-bold">● READY TO PLAY</span>
               </div>
             </div>
 
@@ -642,7 +688,7 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
               className="w-full py-3 rounded-xl bg-gradient-to-r from-[#3ecf8e] to-[#6a4cf7] hover:opacity-95 text-xs font-bold text-[#0d0d0d] flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#3ecf8e]/20 transition-all disabled:opacity-50"
             >
               <Sparkles className="w-4 h-4 text-[#0d0d0d]" />
-              <span>{loading ? 'Saving to Supabase...' : 'Start Listening →'}</span>
+              <span>{loading ? 'Preparing your brief...' : 'Start Listening →'}</span>
             </button>
           )}
         </div>

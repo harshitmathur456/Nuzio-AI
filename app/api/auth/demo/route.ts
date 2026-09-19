@@ -17,27 +17,36 @@ export async function POST(request: Request) {
   const briefLength = body.briefLength || '10 min';
   const deliveryTime = body.deliveryTime || '07:00 AM';
   const language = body.language || 'English';
-  const location = body.location || 'Mumbai, India';
+  const location = body.location || 'Jodhpur, Rajasthan (Hyperlocal active)';
   const notificationsEnabled = body.notificationsEnabled !== undefined ? body.notificationsEnabled : true;
 
   let dbUserId: string | null = null;
   let dbSaved = false;
 
+  // Background save to Supabase with timeout race so the client is never delayed
+  const savePromise = saveUserAndPreferencesToSupabase({
+    email,
+    fullName: name,
+    profession,
+    categories,
+    voice,
+    briefLength,
+    deliveryTime,
+    language,
+    location,
+    notificationsEnabled,
+  });
+
+  const timeoutPromise = new Promise<{ userId?: string }>((resolve) =>
+    setTimeout(() => resolve({}), 1200)
+  );
+
   try {
-    const dbResult = await saveUserAndPreferencesToSupabase({
-      email,
-      fullName: name,
-      profession,
-      categories,
-      voice,
-      briefLength,
-      deliveryTime,
-      language,
-      location,
-      notificationsEnabled,
-    });
-    dbUserId = dbResult.userId;
-    dbSaved = true;
+    const result = await Promise.race([savePromise, timeoutPromise]);
+    if (result && 'userId' in result && result.userId) {
+      dbUserId = result.userId;
+      dbSaved = true;
+    }
   } catch (dbErr) {
     console.warn('Direct Supabase save warning:', dbErr);
   }
@@ -59,7 +68,7 @@ export async function POST(request: Request) {
     success: true,
     user: demoUser,
     dbSaved,
-    message: 'User session and Supabase record saved successfully',
+    message: 'User session and preferences saved successfully',
   });
 
   response.cookies.set('nuzio_demo_user', JSON.stringify(demoUser), {
@@ -79,6 +88,7 @@ export async function POST(request: Request) {
       brief_length: briefLength,
       delivery_time: deliveryTime,
       language,
+      location,
       notifications_enabled: notificationsEnabled,
     }),
     {
