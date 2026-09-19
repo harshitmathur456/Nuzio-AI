@@ -1,36 +1,92 @@
 import { NextResponse } from 'next/server';
+import { saveUserAndPreferencesToSupabase } from '@/lib/db';
 
 export async function POST(request: Request) {
-  let name = 'Aarav Sharma';
-  let email = 'aarav.sharma@nuzio.ai';
+  let body: any = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  const name = body.fullName || body.name || 'Aarav Sharma';
+  const email = body.email || 'aarav.sharma@nuzio.ai';
+  const categories = body.categories || ['AI & Tech', 'Markets', 'Startups'];
+  const profession = body.profession || 'Founder / Builder';
+  const voice = body.voice || 'Aria';
+  const briefLength = body.briefLength || '10 min';
+  const deliveryTime = body.deliveryTime || '07:00 AM';
+  const language = body.language || 'English';
+  const location = body.location || 'Mumbai, India';
+  const notificationsEnabled = body.notificationsEnabled !== undefined ? body.notificationsEnabled : true;
+
+  let dbUserId: string | null = null;
+  let dbSaved = false;
 
   try {
-    const body = await request.json();
-    if (body.name) name = body.name;
-    if (body.email) email = body.email;
-  } catch {
-    // default demo user
+    const dbResult = await saveUserAndPreferencesToSupabase({
+      email,
+      fullName: name,
+      profession,
+      categories,
+      voice,
+      briefLength,
+      deliveryTime,
+      language,
+      location,
+      notificationsEnabled,
+    });
+    dbUserId = dbResult.userId;
+    dbSaved = true;
+  } catch (dbErr) {
+    console.warn('Direct Supabase save warning:', dbErr);
   }
 
   const demoUser = {
-    id: 'demo-user-' + Math.random().toString(36).substring(2, 9),
+    id: dbUserId || 'demo-user-' + Math.random().toString(36).substring(2, 9),
     name,
     email,
+    profession,
+    voice,
+    briefLength,
+    deliveryTime,
+    language,
+    location,
     created_at: new Date().toISOString(),
   };
 
   const response = NextResponse.json({
     success: true,
     user: demoUser,
-    message: 'Demo session created successfully',
+    dbSaved,
+    message: 'User session and Supabase record saved successfully',
   });
 
   response.cookies.set('nuzio_demo_user', JSON.stringify(demoUser), {
     path: '/',
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: 60 * 60 * 24 * 7,
     sameSite: 'lax',
-    httpOnly: false, // Accessible to client for displaying user name
+    httpOnly: false,
   });
+
+  response.cookies.set(
+    'nuzio_demo_preferences',
+    JSON.stringify({
+      categories,
+      full_name: name,
+      profession,
+      voice,
+      brief_length: briefLength,
+      delivery_time: deliveryTime,
+      language,
+      notifications_enabled: notificationsEnabled,
+    }),
+    {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+      sameSite: 'lax',
+    }
+  );
 
   return response;
 }

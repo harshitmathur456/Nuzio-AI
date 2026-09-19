@@ -11,6 +11,8 @@ import { CategoryPills } from '@/components/CategoryPills';
 import { PlayerCard } from '@/components/PlayerCard';
 import { LiveTranscriptStrip } from '@/components/LiveTranscriptStrip';
 import { BottomNav } from '@/components/BottomNav';
+import { DiscoverModal } from '@/components/DiscoverModal';
+import { SettingsModal } from '@/components/SettingsModal';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { Play, Sparkles, X, ExternalLink, Volume2 } from 'lucide-react';
 
@@ -31,6 +33,8 @@ export default function BriefNewsPage() {
   const [searchResults, setSearchResults] = useState<GoogleNewsItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [isDiscoverOpen, setIsDiscoverOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // 1. Initial responsive view mode detection (>=1024px -> Desktop, else Mobile)
   useEffect(() => {
@@ -453,10 +457,35 @@ export default function BriefNewsPage() {
         )}
       </div>
 
-      {/* 6. Fixed Bottom Nav: Discover / Play (center, active) / Settings (visual-only) */}
+      {/* 6. Fixed Bottom Nav: Discover / Play (center, active) / Settings */}
       <BottomNav
         onPlayClick={togglePlayPause}
+        onDiscoverClick={() => setIsDiscoverOpen(true)}
+        onSettingsClick={() => setIsSettingsOpen(true)}
         isPlaying={isPlaying && !isPaused}
+        activeTab={isDiscoverOpen ? 'discover' : isSettingsOpen ? 'settings' : 'play'}
+      />
+
+      {/* 7. Discover Modal */}
+      <DiscoverModal
+        isOpen={isDiscoverOpen}
+        onClose={() => setIsDiscoverOpen(false)}
+        onSelectTopic={(topic) => {
+          setSearchQuery(topic);
+          handleSearchSubmit(topic);
+        }}
+      />
+
+      {/* 8. Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        currentPlaybackRate={playbackRate}
+        onPlaybackRateChange={(rate) => {
+          if (rate !== playbackRate) {
+            cycleRate();
+          }
+        }}
       />
     </div>
   );

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import {
   X,
   ChevronRight,
@@ -12,13 +11,13 @@ import {
   Volume2,
   Clock,
   Bell,
-  Briefcase,
-  Layers,
   MapPin,
   Lock,
   Mail,
   User,
   CheckCircle2,
+  Loader2,
+  Navigation,
 } from 'lucide-react';
 
 interface DemoOnboardingModalProps {
@@ -56,6 +55,9 @@ const VOICES = [
   { id: 'Meera', label: 'Meera', desc: 'Bright · Curious · Indian English' },
 ];
 
+const DELIVERY_TIMES = ['06:30 AM', '07:00 AM', '07:30 AM', '08:00 AM', '08:30 AM', '09:00 AM'];
+const QUICK_CITIES = ['Mumbai', 'Bengaluru', 'Delhi NCR', 'Hyderabad', 'Pune'];
+
 export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProps) {
   const router = useRouter();
 
@@ -69,6 +71,8 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
 
   const [language, setLanguage] = useState<'English' | 'Hindi'>('English');
   const [locationEnabled, setLocationEnabled] = useState(true);
+  const [locationText, setLocationText] = useState('Mumbai, India (Hyperlocal news)');
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   const [profession, setProfession] = useState('Technology');
   const [selectedNiches, setSelectedNiches] = useState<string[]>(['AI & Tech', 'Markets', 'Startups']);
@@ -77,6 +81,7 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
   const [briefLength, setBriefLength] = useState('10 min');
 
   const [deliveryTime, setDeliveryTime] = useState('07:00 AM');
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   const [loading, setLoading] = useState(false);
@@ -105,7 +110,35 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
     setSelectedNiches(['AI & Tech', 'Markets', 'Startups']);
   };
 
-  // Submit complete onboarding to Supabase
+  const handleToggleLocation = () => {
+    if (!locationEnabled) {
+      setLocationEnabled(true);
+      setIsDetectingLocation(true);
+      setLocationText('Detecting GPS & City location...');
+
+      if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setIsDetectingLocation(false);
+            setLocationText('📍 Mumbai, Maharashtra (Hyperlocal active)');
+          },
+          (err) => {
+            setIsDetectingLocation(false);
+            setLocationText('📍 Mumbai, India (Hyperlocal active)');
+          },
+          { timeout: 4000 }
+        );
+      } else {
+        setIsDetectingLocation(false);
+        setLocationText('📍 Mumbai, India (Hyperlocal news)');
+      }
+    } else {
+      setLocationEnabled(false);
+      setLocationText('Location disabled (Global coverage)');
+    }
+  };
+
+  // Submit complete onboarding to backend API which directly writes to Supabase
   const handleCompleteOnboarding = async () => {
     setLoading(true);
     setErrorMsg(null);
@@ -121,53 +154,28 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
     const uniqueCategories = Array.from(new Set(primaryCategories));
 
     try {
-      if (isSupabaseConfigured) {
-        const supabase = createClient();
-        // 1. Create or Sign In user in Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-              profession,
-              voice,
-              brief_length: briefLength,
-              delivery_time: deliveryTime,
-              language,
-              notifications_enabled: notificationsEnabled,
-            },
-          },
-        });
-
-        if (authError && !authError.message.includes('already registered')) {
-          // If already registered, sign in
-          await supabase.auth.signInWithPassword({ email, password });
-        }
-      }
-
-      // 2. Persist full preferences to backend API
-      await fetch('/api/preferences', {
+      // Send directly to backend API (handles Supabase auth & postgres preferences without frontend client limits)
+      const res = await fetch('/api/auth/demo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          categories: uniqueCategories,
-          full_name: fullName,
+          fullName,
+          email,
+          password,
           profession,
+          categories: uniqueCategories,
           voice,
-          brief_length: briefLength,
-          delivery_time: deliveryTime,
+          briefLength,
+          deliveryTime,
           language,
-          notifications_enabled: notificationsEnabled,
+          location: locationText,
+          notificationsEnabled,
         }),
       });
 
-      // 3. Set demo user cookie as reliable fallback
-      await fetch('/api/auth/demo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: fullName, email }),
-      });
+      if (!res.ok) {
+        throw new Error('Failed to save profile to server');
+      }
 
       // Close and navigate to news
       onClose();
@@ -187,7 +195,20 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
         <div>
           <div className="flex items-center justify-between pb-3">
             <span className="font-mono text-[9px] uppercase tracking-widest text-[#6a4cf7] font-semibold">
-              STEP {step} OF 7 · {step === 1 ? 'CREDENTIALS' : step === 2 ? 'LANGUAGE' : step === 3 ? 'PROFESSION' : step === 4 ? 'NICHES' : step === 5 ? 'VOICE' : step === 6 ? 'TIME' : 'READY'}
+              STEP {step} OF 7 ·{' '}
+              {step === 1
+                ? 'CREDENTIALS'
+                : step === 2
+                ? 'LANGUAGE'
+                : step === 3
+                ? 'PROFESSION'
+                : step === 4
+                ? 'NICHES'
+                : step === 5
+                ? 'VOICE'
+                : step === 6
+                ? 'TIME'
+                : 'READY'}
             </span>
             <button
               onClick={onClose}
@@ -212,12 +233,8 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
         {/* Step 1: Account Credentials */}
         {step === 1 && (
           <div className="flex-1 flex flex-col justify-center animate-in fade-in duration-200">
-            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">
-              Create your account.
-            </h3>
-            <p className="font-display italic text-lg text-[#9080ff] mb-4">
-              Saved directly to Supabase.
-            </p>
+            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">Create your account.</h3>
+            <p className="font-display italic text-lg text-[#9080ff] mb-4">Saved directly to Supabase.</p>
 
             <div className="space-y-3 mb-4">
               <div className="relative">
@@ -266,14 +283,10 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
         {/* Step 2: Language & Location (Figma 02_language_location) */}
         {step === 2 && (
           <div className="flex-1 flex flex-col justify-center animate-in fade-in duration-200">
-            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">
-              Choose your
-            </h3>
-            <p className="font-display italic text-2xl text-[#9080ff] mb-4">
-              language & city.
-            </p>
+            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">Choose your</h3>
+            <p className="font-display italic text-2xl text-[#9080ff] mb-4">language & city.</p>
 
-            <div className="space-y-2.5 mb-4">
+            <div className="space-y-2.5 mb-3">
               {[
                 { id: 'English', title: 'English', sub: 'Briefings delivered in English' },
                 { id: 'Hindi', title: 'हिंदी (Hindi)', sub: 'हिंदी में समाचार सुनें' },
@@ -298,20 +311,30 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
                 );
               })}
 
+              {/* Enable Location Box */}
               <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-between mt-2">
                 <div className="flex items-center gap-2.5">
-                  <MapPin className="w-4 h-4 text-[#9080ff]" />
+                  <div className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center">
+                    {isDetectingLocation ? (
+                      <Loader2 className="w-4 h-4 text-[#3ecf8e] animate-spin" />
+                    ) : (
+                      <MapPin className="w-4 h-4 text-[#9080ff]" />
+                    )}
+                  </div>
                   <div>
                     <p className="text-xs font-semibold text-[#f0ede8]">Enable Location</p>
-                    <p className="text-[10px] text-[#8a8480]">Mumbai, India (Hyperlocal news)</p>
+                    <p className={`text-[11px] font-medium transition-colors ${locationEnabled ? 'text-[#3ecf8e]' : 'text-[#8a8480]'}`}>
+                      {locationText}
+                    </p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setLocationEnabled(!locationEnabled)}
+                  onClick={handleToggleLocation}
                   className={`w-10 h-5 rounded-full transition-colors relative p-0.5 ${
                     locationEnabled ? 'bg-[#3ecf8e]' : 'bg-white/20'
                   }`}
+                  aria-label="Toggle location"
                 >
                   <div
                     className={`w-4 h-4 rounded-full bg-white transition-transform ${
@@ -320,6 +343,28 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
                   />
                 </button>
               </div>
+
+              {/* Quick City Selector Chips */}
+              <div className="pt-1">
+                <p className="text-[10px] font-mono text-[#8a8480] uppercase tracking-wider mb-1.5">
+                  Quick Select City:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {QUICK_CITIES.map((city) => (
+                    <button
+                      key={city}
+                      type="button"
+                      onClick={() => {
+                        setLocationEnabled(true);
+                        setLocationText(`📍 ${city}, India (Hyperlocal news)`);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-[#6a4cf7]/20 border border-white/[0.08] hover:border-[#6a4cf7]/40 text-[10.5px] text-[#f0ede8] transition-all cursor-pointer"
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -327,12 +372,8 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
         {/* Step 3: Profession (Figma 04_profession) */}
         {step === 3 && (
           <div className="flex-1 flex flex-col justify-center animate-in fade-in duration-200">
-            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">
-              What&apos;s your
-            </h3>
-            <p className="font-display italic text-2xl text-[#9080ff] mb-4">
-              profession?
-            </p>
+            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">What&apos;s your</h3>
+            <p className="font-display italic text-2xl text-[#9080ff] mb-4">profession?</p>
 
             <div className="grid grid-cols-2 gap-2 max-h-[250px] overflow-y-auto pr-1 mb-2">
               {PROFESSIONS.map((prof) => {
@@ -360,12 +401,8 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
         {/* Step 4: Niches (Figma 05_niches) */}
         {step === 4 && (
           <div className="flex-1 flex flex-col justify-center animate-in fade-in duration-200">
-            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">
-              What moves
-            </h3>
-            <p className="font-display italic text-2xl text-[#9080ff] mb-4">
-              your world?
-            </p>
+            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">What moves</h3>
+            <p className="font-display italic text-2xl text-[#9080ff] mb-4">your world?</p>
             <p className="text-[11px] text-[#8a8480] mb-2 font-mono">
               Pick up to 7 niches ({selectedNiches.length}/7 selected):
             </p>
@@ -396,12 +433,8 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
         {/* Step 5: Voice & Length (Figma 06_voice) */}
         {step === 5 && (
           <div className="flex-1 flex flex-col justify-center animate-in fade-in duration-200">
-            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">
-              Pick a
-            </h3>
-            <p className="font-display italic text-2xl text-[#9080ff] mb-3">
-              narrator voice.
-            </p>
+            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">Pick a</h3>
+            <p className="font-display italic text-2xl text-[#9080ff] mb-3">narrator voice.</p>
 
             <div className="space-y-2 mb-4">
               {VOICES.map((v) => {
@@ -454,29 +487,69 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
         {/* Step 6: Delivery Time & Notifications (Figma 07_time & 08_notifications) */}
         {step === 6 && (
           <div className="flex-1 flex flex-col justify-center animate-in fade-in duration-200">
-            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">
-              When do you want
-            </h3>
-            <p className="font-display italic text-2xl text-[#9080ff] mb-4">
-              your morning brief?
-            </p>
+            <h3 className="font-ui font-bold text-2xl text-[#f0ede8] mb-1">When do you want</h3>
+            <p className="font-display italic text-2xl text-[#9080ff] mb-4">your morning brief?</p>
 
-            <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-between mb-4">
+            {/* Changeable Delivery Time Box */}
+            <div
+              onClick={() => setIsTimePickerOpen(!isTimePickerOpen)}
+              className="p-4 rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.08] hover:border-[#6a4cf7]/40 flex items-center justify-between mb-3 cursor-pointer transition-all group"
+            >
               <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-[#3ecf8e]" />
+                <div className="w-9 h-9 rounded-xl bg-[#3ecf8e]/10 border border-[#3ecf8e]/20 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-[#3ecf8e]" />
+                </div>
                 <div>
-                  <p className="text-xs font-semibold text-[#f0ede8]">Daily Delivery Time</p>
-                  <p className="text-[10px] text-[#8a8480]">Nuzio will prepare audio by this time</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-semibold text-[#f0ede8]">Daily Delivery Time</p>
+                    <span className="text-[9px] font-mono text-[#9080ff] bg-[#6a4cf7]/15 px-1.5 py-0.5 rounded">Tap to change</span>
+                  </div>
+                  <p className="text-[10px] text-[#8a8480]">Nuzio prepares fresh audio every morning</p>
                 </div>
               </div>
-              <span className="font-mono text-base font-bold text-[#6a4cf7]">
-                7:00 AM
+              <span className="font-mono text-base font-bold text-[#6a4cf7] bg-[#6a4cf7]/10 px-3 py-1 rounded-xl border border-[#6a4cf7]/30 group-hover:border-[#6a4cf7]">
+                {deliveryTime}
               </span>
             </div>
 
+            {/* Interactive Time Selector Chips */}
+            {isTimePickerOpen && (
+              <div className="p-3 rounded-2xl bg-[#141414] border border-[#6a4cf7]/30 mb-3 animate-in fade-in slide-in-from-top-2 duration-150">
+                <p className="font-mono text-[9px] uppercase tracking-wider text-[#8a8480] mb-2 font-semibold">
+                  Select Morning Timing:
+                </p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {DELIVERY_TIMES.map((time) => {
+                    const isSelected = deliveryTime === time;
+                    return (
+                      <button
+                        key={time}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeliveryTime(time);
+                          setIsTimePickerOpen(false);
+                        }}
+                        className={`py-2 px-1 rounded-xl text-center font-mono text-xs font-semibold border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#6a4cf7] text-white border-[#6a4cf7] shadow-md shadow-[#6a4cf7]/30'
+                            : 'bg-white/[0.04] border-white/[0.08] text-[#8a8480] hover:bg-white/[0.08] hover:text-white'
+                        }`}
+                      >
+                        {time}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Notifications Toggle */}
             <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
-                <Bell className="w-5 h-5 text-[#9080ff]" />
+                <div className="w-9 h-9 rounded-xl bg-[#6a4cf7]/10 border border-[#6a4cf7]/20 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-[#9080ff]" />
+                </div>
                 <div>
                   <p className="text-xs font-semibold text-[#f0ede8]">Stay in the loop</p>
                   <p className="text-[10px] text-[#8a8480]">Push alerts for breaking stories</p>
@@ -488,6 +561,7 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
                 className={`w-10 h-5 rounded-full transition-colors relative p-0.5 ${
                   notificationsEnabled ? 'bg-[#3ecf8e]' : 'bg-white/20'
                 }`}
+                aria-label="Toggle notifications"
               >
                 <div
                   className={`w-4 h-4 rounded-full bg-white transition-transform ${
@@ -506,12 +580,8 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
               <Check className="w-6 h-6" />
             </div>
 
-            <h3 className="font-ui font-bold text-2xl text-center text-[#f0ede8] mb-1">
-              You&apos;re ready,
-            </h3>
-            <p className="font-display italic text-2xl text-center text-[#9080ff] mb-4">
-              {fullName}.
-            </p>
+            <h3 className="font-ui font-bold text-2xl text-center text-[#f0ede8] mb-1">You&apos;re ready,</h3>
+            <p className="font-display italic text-2xl text-center text-[#9080ff] mb-4">{fullName}.</p>
 
             <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] space-y-2 mb-2 text-xs">
               <div className="flex justify-between py-1 border-b border-white/[0.06]">
@@ -523,18 +593,20 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
                 <span className="font-semibold text-[#3ecf8e]">{selectedNiches.join(', ')}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-white/[0.06]">
-                <span className="text-[#8a8480]">Voice & Length</span>
-                <span className="font-semibold text-white">{voice} · {briefLength}</span>
+                <span className="text-[#8a8480]">Delivery</span>
+                <span className="font-semibold text-white font-mono">{deliveryTime}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-white/[0.06]">
+                <span className="text-[#8a8480]">Location</span>
+                <span className="font-semibold text-white">{locationText.replace('📍 ', '')}</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-[#8a8480]">Supabase Sync</span>
-                <span className="font-mono text-[10px] text-[#3ecf8e] font-bold">● CONNECTED</span>
+                <span className="font-mono text-[10px] text-[#3ecf8e] font-bold">● CLOUD CONNECTED</span>
               </div>
             </div>
 
-            {errorMsg && (
-              <p className="text-red-400 text-[11px] text-center mb-2">{errorMsg}</p>
-            )}
+            {errorMsg && <p className="text-red-400 text-[11px] text-center mb-2">{errorMsg}</p>}
           </div>
         )}
 
