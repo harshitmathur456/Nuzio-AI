@@ -2,25 +2,21 @@
 
 import { useState } from 'react';
 import { Logo } from './Logo';
-import { Search, Bell, X, Smartphone, Monitor, User, LogOut } from 'lucide-react';
+import { Search, Bell, X, Smartphone, Monitor, LogOut } from 'lucide-react';
 
 interface AppHeaderProps {
   userName?: string;
   viewMode: 'mobile' | 'desktop';
   onToggleViewMode: (mode: 'mobile' | 'desktop') => void;
   onSearchSubmit: (query: string) => void;
-  onOpenNotifications: () => void;
-  onOpenSettings: () => void;
   onLogout: () => void;
 }
 
 export function AppHeader({
-  userName = 'Aarav Sharma',
+  userName = 'Aarav',
   viewMode,
   onToggleViewMode,
   onSearchSubmit,
-  onOpenNotifications,
-  onOpenSettings,
   onLogout,
 }: AppHeaderProps) {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -48,7 +44,7 @@ export function AppHeader({
         {/* Logo (left) */}
         {!isSearchExpanded && <Logo size={42} />}
 
-        {/* In-place expanding search input */}
+        {/* In-place expanding search input (functional) */}
         {isSearchExpanded ? (
           <form onSubmit={handleSearchSubmit} className="flex-1 flex items-center gap-2 animate-in fade-in duration-200">
             <div className="relative flex-1 flex items-center">
@@ -80,7 +76,7 @@ export function AppHeader({
             <button
               type="button"
               onClick={handleClearSearch}
-              className="p-1.5 rounded-full text-[#8a8480] hover:text-white shrink-0"
+              className="p-1.5 rounded-full text-[#8a8480] hover:text-white shrink-0 cursor-pointer"
               title="Close search"
             >
               <X className="w-4 h-4" />
@@ -99,22 +95,20 @@ export function AppHeader({
               <Search className="w-3.5 h-3.5" />
             </button>
 
-            {/* Notification Bell with unread dot */}
-            <button
-              onClick={onOpenNotifications}
-              className="w-8 h-8 rounded-full bg-white/[0.06] border border-white/[0.09] flex items-center justify-center text-[#f0ede8]/80 hover:text-white hover:bg-white/[0.12] transition-all relative cursor-pointer"
-              title="Audio live status & alerts"
-              aria-label="Notifications"
+            {/* Notification Bell (visual with unread green dot per PRD) */}
+            <div
+              className="w-8 h-8 rounded-full bg-white/[0.06] border border-white/[0.09] flex items-center justify-center text-[#f0ede8]/80 relative select-none"
+              title="Notifications"
             >
               <Bell className="w-3.5 h-3.5" />
               <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[#3ecf8e] shadow-[0_0_6px_#3ecf8e]" />
-            </button>
+            </div>
 
             {/* View Mode Toggle: [Mobile | Desktop] */}
             <div className="flex items-center p-0.5 rounded-full bg-white/[0.06] border border-white/[0.10] text-[10px] font-mono">
               <button
                 onClick={() => onToggleViewMode('mobile')}
-                className={`flex items-center gap-1 px-2 py-1 rounded-full transition-all cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full transition-all cursor-pointer ${
                   viewMode === 'mobile'
                     ? 'bg-[#6a4cf7] text-white font-semibold shadow-sm'
                     : 'text-[#8a8480] hover:text-[#f0ede8]'
@@ -126,7 +120,7 @@ export function AppHeader({
               </button>
               <button
                 onClick={() => onToggleViewMode('desktop')}
-                className={`flex items-center gap-1 px-2 py-1 rounded-full transition-all cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full transition-all cursor-pointer ${
                   viewMode === 'desktop'
                     ? 'bg-[#6a4cf7] text-white font-semibold shadow-sm'
                     : 'text-[#8a8480] hover:text-[#f0ede8]'
@@ -149,27 +143,17 @@ export function AppHeader({
               </button>
 
               {showProfileMenu && (
-                <div className="absolute right-0 top-10 w-48 rounded-2xl glass-panel p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute right-0 top-10 w-44 rounded-2xl glass-panel p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
                   <div className="px-3 py-2 border-b border-white/[0.08] mb-1">
                     <p className="text-[12px] font-semibold text-[#f0ede8] truncate">{userName}</p>
-                    <p className="text-[10px] text-[#8a8480] font-mono">Pro Audio Member</p>
+                    <p className="text-[10px] text-[#8a8480] font-mono">Authenticated</p>
                   </div>
-                  <button
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      onOpenSettings();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] text-[#f0ede8] hover:bg-white/[0.08] transition-colors text-left"
-                  >
-                    <User className="w-3.5 h-3.5 text-[#9080ff]" />
-                    <span>Settings</span>
-                  </button>
                   <button
                     onClick={() => {
                       setShowProfileMenu(false);
                       onLogout();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] text-red-400 hover:bg-red-500/10 transition-colors text-left cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5 text-red-400" />
                     <span>Sign Out</span>

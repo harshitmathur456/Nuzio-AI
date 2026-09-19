@@ -11,8 +11,6 @@ import { CategoryPills } from '@/components/CategoryPills';
 import { PlayerCard } from '@/components/PlayerCard';
 import { LiveTranscriptStrip } from '@/components/LiveTranscriptStrip';
 import { BottomNav } from '@/components/BottomNav';
-import { NotificationDrawer } from '@/components/NotificationDrawer';
-import { SettingsModal } from '@/components/SettingsModal';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { Play, Sparkles, X, ExternalLink, Volume2 } from 'lucide-react';
 
@@ -33,10 +31,6 @@ export default function BriefNewsPage() {
   const [searchResults, setSearchResults] = useState<GoogleNewsItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-
-  // Modals & drawers
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // 1. Initial responsive view mode detection (>=1024px -> Desktop, else Mobile)
   useEffect(() => {
@@ -150,7 +144,7 @@ export default function BriefNewsPage() {
     seekToRatio,
   } = useAudioPlayer(articles);
 
-  // 5. Handle Category Pill Selection & Persistence
+  // 5. Handle Category Pill Selection & Persistence (POST /api/preferences)
   const handleSelectCategory = async (category: NewsCategory) => {
     setActiveCategory(category);
 
@@ -187,7 +181,7 @@ export default function BriefNewsPage() {
       } else {
         setSearchError(data.error || 'No news stories found');
       }
-    } catch (err) {
+    } catch {
       setSearchError('Failed to fetch Google News results');
     } finally {
       setIsSearching(false);
@@ -231,19 +225,17 @@ export default function BriefNewsPage() {
           : 'w-full max-w-[430px] border-x border-white/[0.06] bg-[#0d0d0d] shadow-2xl pb-28'
       }`}
     >
-      {/* 1. Header with in-place functional search, notifications, & Desktop/Mobile switch */}
+      {/* 1. Header with in-place functional search, notifications (unread dot), & Desktop/Mobile switch */}
       <AppHeader
         userName={userName}
         viewMode={viewMode}
         onToggleViewMode={setViewMode}
         onSearchSubmit={handleSearchSubmit}
-        onOpenNotifications={() => setIsNotificationsOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
         onLogout={handleLogout}
       />
 
       <div className="flex-1 flex flex-col">
-        {/* 2. Google News Search Results (Temporary Ephemeral Layer) */}
+        {/* Search Results (Temporary Ephemeral Layer backed by Google News) */}
         {searchQuery && (
           <div className="mx-4 my-3 p-4 rounded-2xl glass-card border border-white/[0.12] animate-in fade-in duration-200">
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.08]">
@@ -255,7 +247,7 @@ export default function BriefNewsPage() {
               </div>
               <button
                 onClick={handleClearSearchResults}
-                className="text-[#8a8480] hover:text-white text-xs flex items-center gap-1"
+                className="text-[#8a8480] hover:text-white text-xs flex items-center gap-1 cursor-pointer"
               >
                 <span>Clear</span>
                 <X className="w-3.5 h-3.5" />
@@ -312,7 +304,7 @@ export default function BriefNewsPage() {
           </div>
         )}
 
-        {/* 3. Category Pills Bar */}
+        {/* 2. Category Pills Bar */}
         <CategoryPills
           categories={['All', 'AI & Tech', 'Markets', 'Startups', 'Science', 'Global']}
           activeCategory={activeCategory}
@@ -320,7 +312,7 @@ export default function BriefNewsPage() {
           isLoading={loading}
         />
 
-        {/* 4. Greeting Row & Status Line */}
+        {/* 3. Greeting Row & Status Line */}
         <div className={`pt-2 pb-1 ${isDesktop ? 'px-7' : 'px-5'}`}>
           <h1 className="font-display text-[26px] leading-[1.12] text-[#f0ede8]">
             Good morning, {userName} —{' '}
@@ -344,7 +336,7 @@ export default function BriefNewsPage() {
           </div>
         </div>
 
-        {/* 5. Main Canvas Layout: Desktop 2-Column vs Mobile Single Column */}
+        {/* 4. Player Card & Layout (Desktop 2-Column vs Mobile Single-Column) */}
         {isDesktop ? (
           /* Desktop 2-Column Mode */
           <div className="grid grid-cols-12 gap-6 px-7 py-4 flex-1">
@@ -355,7 +347,7 @@ export default function BriefNewsPage() {
                   Queue ({articles.length} Stories)
                 </span>
                 <span className="font-mono text-[9.5px] text-[#9080ff]">
-                  Sorted by Personalization
+                  Ranked by Personalization
                 </span>
               </div>
 
@@ -421,7 +413,7 @@ export default function BriefNewsPage() {
                 />
               )}
 
-              {/* Transcript Strip: visible only while playing */}
+              {/* 5. Transcript Strip: small glass pill, green text, visible only while playing */}
               <div className="mt-3">
                 <LiveTranscriptStrip spokenText={currentSpokenText} isPlaying={isPlaying && !isPaused} />
               </div>
@@ -455,35 +447,16 @@ export default function BriefNewsPage() {
               </div>
             )}
 
-            {/* Transcript Strip: visible only while playing */}
+            {/* 5. Transcript Strip: visible only while playing */}
             <LiveTranscriptStrip spokenText={currentSpokenText} isPlaying={isPlaying && !isPaused} />
           </div>
         )}
       </div>
 
-      {/* Floating Bottom Nav */}
+      {/* 6. Fixed Bottom Nav: Discover / Play (center, active) / Settings (visual-only) */}
       <BottomNav
-        activeTab="play"
-        onSelectTab={(tab) => {
-          if (tab === 'settings') setIsSettingsOpen(true);
-        }}
+        onPlayClick={togglePlayPause}
         isPlaying={isPlaying && !isPaused}
-      />
-
-      {/* Modals & Drawers */}
-      <NotificationDrawer
-        isOpen={isNotificationsOpen}
-        onClose={() => setIsNotificationsOpen(false)}
-        storyCount={articles.length}
-        totalMinutes={Math.ceil(articles.reduce((acc, a) => acc + (a.durationSec || 40), 0) / 60)}
-      />
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        userName={userName}
-        isSupabaseLive={isSupabaseConfigured}
-        onLogout={handleLogout}
       />
     </div>
   );
