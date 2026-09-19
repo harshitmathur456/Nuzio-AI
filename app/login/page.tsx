@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { AudioWaveform } from '@/components/AudioWaveform';
 import { Logo } from '@/components/Logo';
+import { DemoOnboardingModal } from '@/components/DemoOnboardingModal';
 import { Sparkles, ArrowRight, Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [isDemoWizardOpen, setIsDemoWizardOpen] = useState(false);
   const [isEmailMode, setIsEmailMode] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -24,7 +26,6 @@ export default function LoginPage() {
     setErrorMsg(null);
 
     if (!isSupabaseConfigured) {
-      // If Supabase keys aren't set in environment, seamlessly initialize demo session with prompt
       setInfoMsg('Connecting via Supabase Auth... (Demo mode active as fallback)');
       await handleDemoSignIn('Aarav Sharma', 'google_user@nuzio.ai');
       return;
@@ -68,7 +69,6 @@ export default function LoginPage() {
     }
 
     if (!isSupabaseConfigured) {
-      // Seamless demo session fallback
       await handleDemoSignIn(name || email.split('@')[0], email);
       return;
     }
@@ -202,24 +202,35 @@ export default function LoginPage() {
               </span>
             </button>
 
-            {/* Email Fallback Toggle */}
+            {/* (Create Demo) Button placed directly under Continue with Google */}
             <button
-              onClick={() => setIsEmailMode(true)}
-              className="text-center text-[12px] text-[#8a8480] hover:text-[#f0ede8] transition-colors py-1 cursor-pointer"
+              type="button"
+              onClick={() => setIsDemoWizardOpen(true)}
+              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#6a4cf7]/25 via-[#9080ff]/20 to-[#3ecf8e]/20 hover:from-[#6a4cf7]/35 hover:to-[#3ecf8e]/30 border border-[#6a4cf7]/40 hover:border-[#3ecf8e]/50 text-[#f0ede8] font-semibold text-[13.5px] flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-lg shadow-[#6a4cf7]/20 group"
             >
-              Use email instead &rarr;
+              <Sparkles className="w-4 h-4 text-[#3ecf8e] group-hover:rotate-12 transition-transform" />
+              <span>(Create Demo)</span>
+              <span className="text-[11px] font-mono text-[#9080ff] font-normal">· Setup All Preferences</span>
             </button>
 
-            {/* Quick Demo Access CTA for instant reviewer evaluation */}
-            <button
-              onClick={() => handleDemoSignIn('Aarav Sharma', 'aarav.sharma@nuzio.ai')}
-              disabled={loading}
-              className="w-full py-3 px-4 rounded-xl bg-[#6a4cf7]/15 hover:bg-[#6a4cf7]/25 border border-[#6a4cf7]/30 text-[#9080ff] text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-[#3ecf8e]" />
-              <span>Explore Demo Brief (Instant Access)</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            {/* Email Fallback Toggle */}
+            <div className="flex items-center justify-between pt-1">
+              <button
+                onClick={() => setIsEmailMode(true)}
+                className="text-[12px] text-[#8a8480] hover:text-[#f0ede8] transition-colors py-1 cursor-pointer"
+              >
+                Use email instead &rarr;
+              </button>
+
+              {/* Instant Guest demo */}
+              <button
+                onClick={() => handleDemoSignIn('Aarav Sharma', 'aarav.sharma@nuzio.ai')}
+                disabled={loading}
+                className="text-[11.5px] text-[#3ecf8e] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>Instant Guest Brief &rarr;</span>
+              </button>
+            </div>
           </>
         ) : (
           /* Email / Password Form */
@@ -283,7 +294,7 @@ export default function LoginPage() {
                 onClick={() => setIsEmailMode(false)}
                 className="text-[#9080ff] hover:underline"
               >
-                Back to Google
+                Back to Google / Demo
               </button>
             </div>
           </form>
@@ -297,6 +308,12 @@ export default function LoginPage() {
           <span className="text-[#9080ff] underline underline-offset-2 cursor-pointer">Privacy Policy</span>.
         </div>
       </div>
+
+      {/* Full Multi-Step Demo Onboarding Modal */}
+      <DemoOnboardingModal
+        isOpen={isDemoWizardOpen}
+        onClose={() => setIsDemoWizardOpen(false)}
+      />
     </div>
   );
 }

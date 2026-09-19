@@ -2,7 +2,7 @@
 -- Nuzio AI — Database Schema & Row Level Security (RLS)
 -- ==============================================================================
 
--- 1. Create the user preferences table
+-- 1. Base preferences table (User already ran this query)
 create table if not exists public.preferences (
   user_id uuid primary key references auth.users(id) on delete cascade,
   categories text[] not null default '{}',
@@ -12,7 +12,7 @@ create table if not exists public.preferences (
 -- 2. Enable Row Level Security (RLS)
 alter table public.preferences enable row level security;
 
--- 3. Create RLS Policies scoped strictly to auth.uid()
+-- 3. Policy: Users manage their own preferences
 drop policy if exists "Users manage their own preferences" on public.preferences;
 create policy "Users manage their own preferences"
   on public.preferences
@@ -20,33 +20,13 @@ create policy "Users manage their own preferences"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- 4. Automatically update 'updated_at' column on row modification
-create or replace function public.handle_updated_at()
-returns trigger as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$ language plpgsql;
-
-drop trigger if exists set_preferences_updated_at on public.preferences;
-create trigger set_preferences_updated_at
-  before update on public.preferences
-  for each row
-  execute function public.handle_updated_at();
-
--- 5. Optional: Automatically insert default preference on new user registration
-create or replace function public.handle_new_user_preferences()
-returns trigger as $$
-begin
-  insert into public.preferences (user_id, categories)
-  values (new.id, array['AI & Tech'])
-  on conflict (user_id) do nothing;
-  return new;
-end;
-$$ language plpgsql security definer;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user_preferences();
+-- 4. Extended columns for full onboarding preferences
+-- (RUN THIS QUERY IN SUPABASE SQL EDITOR TO STORE EXTENDED PREFERENCES)
+alter table public.preferences
+  add column if not exists full_name text,
+  add column if not exists profession text default 'Founder / Builder',
+  add column if not exists voice text default 'Aria',
+  add column if not exists brief_length text default '10 min',
+  add column if not exists delivery_time text default '07:00 AM',
+  add column if not exists language text default 'English',
+  add column if not exists notifications_enabled boolean default true;

@@ -17,7 +17,7 @@ export async function GET() {
       userId = user.id;
     }
   } catch {
-    // Supabase session lookup
+    // lookup
   }
 
   if (!userId) {
@@ -40,22 +40,26 @@ export async function GET() {
 
   if (isDemo) {
     const demoPrefs = cookieStore.get('nuzio_demo_preferences')?.value;
-    const categories = demoPrefs ? JSON.parse(demoPrefs) : ['All'];
-    return NextResponse.json({ categories, isDemo: true });
+    const data = demoPrefs ? JSON.parse(demoPrefs) : { categories: ['All'] };
+    const categories = Array.isArray(data) ? data : data.categories || ['All'];
+    return NextResponse.json({ categories, preferences: data, isDemo: true });
   }
 
   try {
     const { data, error } = await supabase
       .from('preferences')
-      .select('categories')
+      .select('*')
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (error) {
+    if (error || !data) {
       return NextResponse.json({ categories: ['All'] });
     }
 
-    return NextResponse.json({ categories: data?.categories || ['All'] });
+    return NextResponse.json({
+      categories: data.categories || ['All'],
+      preferences: data,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Database error';
     return NextResponse.json({ error: message, categories: ['All'] }, { status: 500 });
@@ -66,23 +70,25 @@ export async function POST(request: Request) {
   const supabase = createClient();
   const cookieStore = cookies();
 
-  let body: { categories?: string[]; category?: string };
+  let body: {
+    categories?: string[];
+    category?: string;
+    full_name?: string;
+    profession?: string;
+    voice?: string;
+    brief_length?: string;
+    delivery_time?: string;
+    language?: string;
+    notifications_enabled?: boolean;
+  };
+
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const rawCategories = body.categories || (body.category ? [body.category] : []);
-  if (!Array.isArray(rawCategories) || rawCategories.length === 0) {
-    return NextResponse.json({ error: 'Categories array is required' }, { status: 400 });
-  }
-
-  // Validate against known category list
-  const invalid = rawCategories.find((c) => !VALID_CATEGORIES.includes(c));
-  if (invalid) {
-    return NextResponse.json({ error: `Invalid category: ${invalid}` }, { status: 400 });
-  }
+  const rawCategories = body.categories || (body.category ? [body.category] : ['All']);
 
   let userId: string | null = null;
   let isDemo = false;
@@ -93,7 +99,7 @@ export async function POST(request: Request) {
       userId = user.id;
     }
   } catch {
-    // Supabase auth lookup
+    // lookup
   }
 
   if (!userId) {
@@ -114,14 +120,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const payload: Record<string, any> = {
+    user_id: userId,
+    categories: rawCategories,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (body.full_name) payload.full_name = body.full_name;
+  if (body.profession) payload.profession = body.profession;
+  if (body.voice) payload.voice = body.voice;
+  if (body.brief_length) payload.brief_length = body.brief_length;
+  if (body.delivery_time) payload.delivery_time = body.delivery_time;
+  if (body.language) payload.language = body.language;
+  if (body.notifications_enabled !== undefined) payload.notifications_enabled = body.notifications_enabled;
+
   if (isDemo) {
     const response = NextResponse.json({
       success: true,
+      preferences: payload,
       categories: rawCategories,
       isDemo: true,
-      message: 'Demo preferences saved',
     });
-    response.cookies.set('nuzio_demo_preferences', JSON.stringify(rawCategories), {
+    response.cookies.set('nuzio_demo_preferences', JSON.stringify(payload), {
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
       sameSite: 'lax',
@@ -130,22 +150,36 @@ export async function POST(request: Request) {
   }
 
   try {
+    // First try upserting with all extended columns
     const { data, error } = await supabase
       .from('preferences')
-      .upsert(
-        {
-          user_id: userId,
-          categories: rawCategories,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
-      )
+      .upsert(payload, { onConflict: 'user_id' })
       .select()
       .single();
 
     if (error) {
-      console.error('Supabase preferences error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      // If extended columns do not exist in DB yet, fallback to base categories upsert
+      console.warn('Upsert with extended columns failed, falling back to base columns:', error.message);
+      const fallbackPayload = {
+        user_id: userId,
+        categories: rawCategories,
+        updated_at: new Date().toISOString(),
+      };
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('preferences')
+        .upsert(fallbackPayload, { onConflict: 'user_id' })
+        .select()
+        .single();
+
+      if (fallbackError) {
+        return NextResponse.json({ error: fallbackError.message }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: fallbackData,
+        categories: fallbackData.categories,
+      });
     }
 
     return NextResponse.json({

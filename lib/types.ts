@@ -28,6 +28,13 @@ export interface UserPreference {
   userId: string;
   categories: string[];
   updatedAt: string;
+  fullName?: string;
+  profession?: string;
+  voice?: string;
+  briefLength?: string;
+  deliveryTime?: string;
+  language?: string;
+  notificationsEnabled?: boolean;
 }
 
 export interface PlaybackState {
