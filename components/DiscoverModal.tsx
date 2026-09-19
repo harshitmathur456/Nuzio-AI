@@ -51,14 +51,14 @@ export function DiscoverModal({
                   {item.category}
                 </span>
                 <span className="font-mono text-[10px] text-[#8a8480]">
-                  {item.source} · {item.readTimeMins} MIN
+                  {item.source} · {Math.ceil(item.durationSec / 60)} MIN
                 </span>
               </div>
               <h4 className="font-display text-base text-[#f0ede8] leading-tight group-hover:text-[#3ecf8e] transition-colors">
                 {item.headline}
               </h4>
               <p className="text-[11.5px] text-[#8a8480] line-clamp-2 leading-relaxed">
-                {item.summary}
+                {item.standfirst || item.body}
               </p>
               <div className="flex items-center gap-1.5 text-[11px] text-[#3ecf8e] font-semibold mt-1">
                 <Play className="w-3 h-3 fill-current" />

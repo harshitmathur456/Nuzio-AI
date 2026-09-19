@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
+const VALID_CATEGORIES = ['All', 'AI & Tech', 'Markets', 'Startups', 'Science', 'Global'];
+
 export async function GET() {
   const supabase = createClient();
   const cookieStore = cookies();
@@ -15,10 +17,9 @@ export async function GET() {
       userId = user.id;
     }
   } catch {
-    // Supabase unreachable or unconfigured
+    // Supabase session lookup
   }
 
-  // Check demo fallback
   if (!userId) {
     const demoCookie = cookieStore.get('nuzio_demo_user')?.value;
     if (demoCookie) {
@@ -51,7 +52,6 @@ export async function GET() {
       .maybeSingle();
 
     if (error) {
-      // Table might not exist yet or connection issue
       return NextResponse.json({ categories: ['All'] });
     }
 
@@ -78,6 +78,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Categories array is required' }, { status: 400 });
   }
 
+  // Validate against known category list
+  const invalid = rawCategories.find((c) => !VALID_CATEGORIES.includes(c));
+  if (invalid) {
+    return NextResponse.json({ error: `Invalid category: ${invalid}` }, { status: 400 });
+  }
+
   let userId: string | null = null;
   let isDemo = false;
 
@@ -87,7 +93,7 @@ export async function POST(request: Request) {
       userId = user.id;
     }
   } catch {
-    // Supabase unreachable or unconfigured
+    // Supabase auth lookup
   }
 
   if (!userId) {
@@ -113,18 +119,17 @@ export async function POST(request: Request) {
       success: true,
       categories: rawCategories,
       isDemo: true,
-      message: 'Demo preferences saved to session cookie',
+      message: 'Demo preferences saved',
     });
     response.cookies.set('nuzio_demo_preferences', JSON.stringify(rawCategories), {
       path: '/',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      maxAge: 60 * 60 * 24 * 30,
       sameSite: 'lax',
     });
     return response;
   }
 
   try {
-    // Upsert into preferences table with RLS
     const { data, error } = await supabase
       .from('preferences')
       .upsert(
@@ -139,7 +144,7 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      console.error('Supabase preferences upsert error:', error);
+      console.error('Supabase preferences error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

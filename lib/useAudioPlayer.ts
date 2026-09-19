@@ -5,24 +5,25 @@ import { Article } from './types';
 
 export function useAudioPlayer(articles: Article[]) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [activeArticleOverride, setActiveArticleOverride] = useState<Article | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [playbackRate, setPlaybackRate] = useState<1 | 1.25 | 1.5>(1);
-  const [elapsedSecs, setElapsedSecs] = useState(0);
+  const [progressRatio, setProgressRatio] = useState(0); // 0 to 1
   const [currentSpokenText, setCurrentSpokenText] = useState('');
-  
-  const currentArticle = articles[currentIndex] || null;
-  // Estimated duration in seconds (based on readTimeMins or word count, adjusted by playbackRate)
-  const totalSecs = currentArticle 
-    ? Math.max(30, Math.round((currentArticle.readTimeMins * 60) / playbackRate))
-    : 120;
+
+  // The active article is either an override (e.g. search result swapped in) or the queue article
+  const currentArticle = activeArticleOverride || articles[currentIndex] || null;
+  const durationSec = currentArticle?.durationSec || 40;
+  const elapsedSecs = Math.round(progressRatio * durationSec);
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const fullTextRef = useRef<string>('');
+  const totalLengthRef = useRef<number>(1);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Clean stop of speech
-  const stopSpeech = useCallback(() => {
+  // Clean stop
+  const cancelUtterance = useCallback(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -32,51 +33,39 @@ export function useAudioPlayer(articles: Article[]) {
     }
   }, []);
 
-  // Advance to next story
-  const handleNext = useCallback(() => {
-    if (articles.length === 0) return;
-    stopSpeech();
-    setCurrentIndex((prev) => (prev + 1) % articles.length);
-    setElapsedSecs(0);
-  }, [articles.length, stopSpeech]);
-
-  // Go to previous story
-  const handlePrev = useCallback(() => {
-    if (articles.length === 0) return;
-    stopSpeech();
-    setCurrentIndex((prev) => (prev - 1 + articles.length) % articles.length);
-    setElapsedSecs(0);
-  }, [articles.length, stopSpeech]);
-
-  // Start speaking current article
-  const speakCurrent = useCallback(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !currentArticle) {
+  // Play article narration
+  const playArticle = useCallback((article: Article, rate: number = playbackRate) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !article) {
       return;
     }
 
-    stopSpeech();
+    cancelUtterance();
 
-    const fullScript = `${currentArticle.headline}. ${currentArticle.narrationText}`;
-    fullTextRef.current = fullScript;
-    setCurrentSpokenText(currentArticle.headline);
+    // Narrate headline + ". " + body (or for search items: title + ". From " + source)
+    let scriptToSpeak = '';
+    if (article.isSearchItem || !article.body) {
+      scriptToSpeak = `${article.headline}. From ${article.source}.`;
+    } else {
+      scriptToSpeak = `${article.headline}. ${article.body}`;
+    }
 
-    const utterance = new SpeechSynthesisUtterance(fullScript);
-    utterance.rate = playbackRate;
+    fullTextRef.current = scriptToSpeak;
+    totalLengthRef.current = Math.max(1, scriptToSpeak.length);
+    setCurrentSpokenText(article.headline);
+
+    const utterance = new SpeechSynthesisUtterance(scriptToSpeak);
+    utterance.rate = rate;
     utterance.pitch = 1.0;
 
-    // Pick best available natural voice (preference: Aria, Google, Natural, or English)
+    // Select natural voice (Aria preference)
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(
-      (v) =>
-        v.name.includes('Aria') ||
-        v.name.includes('Google UK English Female') ||
-        v.name.includes('Google US English') ||
-        v.name.includes('Samantha') ||
-        (v.lang.startsWith('en') && v.name.includes('Natural'))
-    ) || voices.find((v) => v.lang.startsWith('en'));
+    const ariaVoice = voices.find((v) => v.name.includes('Aria')) ||
+      voices.find((v) => v.name.includes('Google UK English Female')) ||
+      voices.find((v) => v.name.includes('Google US English')) ||
+      voices.find((v) => v.lang.startsWith('en'));
 
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
+    if (ariaVoice) {
+      utterance.voice = ariaVoice;
     }
 
     utterance.onstart = () => {
@@ -84,18 +73,20 @@ export function useAudioPlayer(articles: Article[]) {
       setIsPaused(false);
     };
 
-    // Track word boundaries for live transcript
+    // Driven by the Speech Synthesis boundary event (char index ÷ total length)
+    // mapped against estimated duration
     utterance.onboundary = (event) => {
-      if (event.name === 'word' || event.charIndex !== undefined) {
-        const charIdx = event.charIndex;
-        // Grab current sentence or slice for transcript strip
-        const remaining = fullScript.slice(charIdx);
-        const nextSentenceEnd = remaining.indexOf('.');
-        const activeChunk = nextSentenceEnd > 0 
-          ? remaining.slice(0, nextSentenceEnd) 
-          : remaining.slice(0, 60);
-        
-        setCurrentSpokenText(activeChunk || currentArticle.headline);
+      if (event.charIndex !== undefined) {
+        const ratio = Math.min(1, Math.max(0, event.charIndex / totalLengthRef.current));
+        setProgressRatio(ratio);
+
+        // Update transcript snippet
+        const remaining = fullTextRef.current.slice(event.charIndex);
+        const nextPeriod = remaining.indexOf('.');
+        const snippet = nextPeriod > 0 ? remaining.slice(0, nextPeriod) : remaining.slice(0, 50);
+        if (snippet.trim()) {
+          setCurrentSpokenText(snippet.trim());
+        }
       }
     };
 
@@ -109,21 +100,24 @@ export function useAudioPlayer(articles: Article[]) {
       setIsPlaying(true);
     };
 
-    // Auto-advance on end
     utterance.onend = () => {
       setIsPlaying(false);
       setIsPaused(false);
+      setProgressRatio(1);
       if (intervalRef.current) clearInterval(intervalRef.current);
-      // Automatically advance to next article
-      if (currentIndex < articles.length - 1) {
-        handleNext();
-      } else {
-        setElapsedSecs(0);
+
+      // Auto-advance if not playing a search item
+      if (!article.isSearchItem && currentIndex < articles.length - 1) {
+        setCurrentIndex((prev) => prev + 1);
+        setProgressRatio(0);
       }
     };
 
     utterance.onerror = (e) => {
-      console.warn('Speech synthesis error/cancelled:', e);
+      // ignore canceled errors
+      if (e.error !== 'canceled' && e.error !== 'interrupted') {
+        console.warn('SpeechSynthesis error:', e.error);
+      }
       setIsPlaying(false);
       setIsPaused(false);
     };
@@ -132,87 +126,111 @@ export function useAudioPlayer(articles: Article[]) {
     window.speechSynthesis.speak(utterance);
     setIsPlaying(true);
     setIsPaused(false);
+  }, [cancelUtterance, playbackRate, currentIndex, articles.length]);
 
-    // Progress timer tick
-    intervalRef.current = setInterval(() => {
-      setElapsedSecs((prev) => {
-        if (prev >= totalSecs) {
-          return totalSecs;
-        }
-        return prev + 1;
-      });
-    }, 1000);
-  }, [currentArticle, playbackRate, totalSecs, currentIndex, articles.length, handleNext, stopSpeech]);
-
-  // Toggle Play / Pause
+  // Handle Play/Pause
   const togglePlayPause = useCallback(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !currentArticle) {
       return;
     }
 
     if (isPlaying && !isPaused) {
-      // Pause
+      // Pause: uses speechSynthesis.pause() — never cancel+restart
       window.speechSynthesis.pause();
       setIsPaused(true);
       setIsPlaying(false);
-      if (intervalRef.current) clearInterval(intervalRef.current);
     } else if (isPaused) {
-      // Resume
+      // Resume: uses speechSynthesis.resume()
       window.speechSynthesis.resume();
       setIsPaused(false);
       setIsPlaying(true);
-      intervalRef.current = setInterval(() => {
-        setElapsedSecs((prev) => Math.min(totalSecs, prev + 1));
-      }, 1000);
     } else {
-      // Start fresh
-      speakCurrent();
+      // Fresh start
+      playArticle(currentArticle, playbackRate);
     }
-  }, [isPlaying, isPaused, speakCurrent, totalSecs]);
+  }, [isPlaying, isPaused, currentArticle, playArticle, playbackRate]);
 
-  // Toggle speed (1x -> 1.25x -> 1.5x -> 1x)
+  // Next: cancels current utterance and starts the new one
+  const handleNext = useCallback(() => {
+    if (articles.length === 0) return;
+    setActiveArticleOverride(null);
+    cancelUtterance();
+    const nextIdx = (currentIndex + 1) % articles.length;
+    setCurrentIndex(nextIdx);
+    setProgressRatio(0);
+    const nextArticle = articles[nextIdx];
+    if (nextArticle) {
+      playArticle(nextArticle, playbackRate);
+    }
+  }, [articles, currentIndex, cancelUtterance, playArticle, playbackRate]);
+
+  // Previous: cancels current utterance and starts the previous one
+  const handlePrev = useCallback(() => {
+    if (articles.length === 0) return;
+    setActiveArticleOverride(null);
+    cancelUtterance();
+    const prevIdx = (currentIndex - 1 + articles.length) % articles.length;
+    setCurrentIndex(prevIdx);
+    setProgressRatio(0);
+    const prevArticle = articles[prevIdx];
+    if (prevArticle) {
+      playArticle(prevArticle, playbackRate);
+    }
+  }, [articles, currentIndex, cancelUtterance, playArticle, playbackRate]);
+
+  // Changing speed: restarts current utterance at the new rate
   const cycleRate = useCallback(() => {
     const nextRate: 1 | 1.25 | 1.5 =
       playbackRate === 1 ? 1.25 : playbackRate === 1.25 ? 1.5 : 1;
     setPlaybackRate(nextRate);
 
-    // If currently playing, re-speak at new rate from current context
-    if (isPlaying) {
-      stopSpeech();
-      setTimeout(() => {
-        if (typeof window !== 'undefined' && currentArticle) {
-          const fullScript = `${currentArticle.headline}. ${currentArticle.narrationText}`;
-          const utterance = new SpeechSynthesisUtterance(fullScript);
-          utterance.rate = nextRate;
-          utteranceRef.current = utterance;
-          window.speechSynthesis.speak(utterance);
-          setIsPlaying(true);
-          setIsPaused(false);
-        }
-      }, 100);
+    if (currentArticle && (isPlaying || isPaused)) {
+      // Web Speech API can't change rate mid-utterance: restart at new rate
+      playArticle(currentArticle, nextRate);
     }
-  }, [playbackRate, isPlaying, stopSpeech, currentArticle]);
+  }, [playbackRate, currentArticle, isPlaying, isPaused, playArticle]);
+
+  // Jump directly to specific story in the queue
+  const playStoryAtIndex = useCallback((index: number) => {
+    if (index >= 0 && index < articles.length) {
+      setActiveArticleOverride(null);
+      setCurrentIndex(index);
+      setProgressRatio(0);
+      playArticle(articles[index], playbackRate);
+    }
+  }, [articles, playArticle, playbackRate]);
+
+  // Play a search result item swapped into the player
+  const playSearchResult = useCallback((item: { title: string; link: string; source: string; pubDate: string }) => {
+    const searchArticle: Article = {
+      id: `search-${Date.now()}`,
+      category: 'Global',
+      headline: item.title,
+      standfirst: `Live from ${item.source}`,
+      body: `Reporting from ${item.source}: ${item.title}. Published recently on Google News.`,
+      source: item.source,
+      sourceUrl: item.link,
+      publishedAt: item.pubDate,
+      durationSec: 25,
+      isSearchItem: true,
+    };
+
+    setActiveArticleOverride(searchArticle);
+    setProgressRatio(0);
+    playArticle(searchArticle, playbackRate);
+  }, [playArticle, playbackRate]);
 
   // Scrub progress
   const seekToRatio = useCallback((ratio: number) => {
-    const newSecs = Math.round(ratio * totalSecs);
-    setElapsedSecs(newSecs);
-  }, [totalSecs]);
+    setProgressRatio(ratio);
+  }, []);
 
-  // Cleanup on unmount or index change
+  // Always cancel on unmount
   useEffect(() => {
     return () => {
-      stopSpeech();
+      cancelUtterance();
     };
-  }, [stopSpeech]);
-
-  // Reset progress on story change
-  useEffect(() => {
-    setElapsedSecs(0);
-    if (currentArticle) {
-      setCurrentSpokenText(currentArticle.headline);
-    }
-  }, [currentIndex, currentArticle]);
+  }, [cancelUtterance]);
 
   return {
     currentIndex,
@@ -220,14 +238,17 @@ export function useAudioPlayer(articles: Article[]) {
     isPlaying,
     isPaused,
     playbackRate,
+    progressRatio,
     elapsedSecs,
-    totalSecs,
+    durationSec,
     currentSpokenText,
-    setCurrentIndex,
+    isSearchPlaying: Boolean(activeArticleOverride?.isSearchItem),
     togglePlayPause,
     handleNext,
     handlePrev,
     cycleRate,
+    playStoryAtIndex,
+    playSearchResult,
     seekToRatio,
   };
 }

@@ -40,18 +40,15 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#0d0d0d] text-[#f0ede8] antialiased selection:bg-[#6a4cf7]/40 selection:text-white relative overflow-x-hidden flex justify-center">
         {/* Ambient background aura blobs matching Figma Make export */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          {/* Violet bottom glow */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_100%,rgba(106,76,247,0.18)_0%,transparent_55%)]" />
-          {/* Blue top-right aura */}
           <div className="absolute -top-[5%] -right-[15%] w-[550px] h-[350px] rounded-full bg-[radial-gradient(circle,rgba(76,141,255,0.14)_0%,transparent_70%)] blur-[60px]" />
-          {/* Green accent aura */}
           <div className="absolute top-[28%] -left-[15%] w-[450px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(62,207,142,0.10)_0%,transparent_70%)] blur-[56px]" />
         </div>
 
-        {/* Central mobile-first phone column matching Figma shell */}
-        <main className="w-full max-w-[430px] min-h-screen relative z-10 flex flex-col bg-[#0d0d0d] border-x border-white/[0.06] shadow-2xl">
+        {/* Dynamic container width controlled by page view mode */}
+        <div className="w-full flex justify-center relative z-10">
           {children}
-        </main>
+        </div>
       </body>
     </html>
   );

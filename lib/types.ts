@@ -1,18 +1,27 @@
-export type NewsCategory = 'All' | 'AI & Tech' | 'Markets' | 'Startups' | 'Science' | 'Global';
+export type Category = "AI & Tech" | "Markets" | "Startups" | "Science" | "Global";
+export type NewsCategory = "All" | Category;
 
 export interface Article {
   id: string;
-  category: Exclude<NewsCategory, 'All'>;
+  category: Category;
   headline: string;
-  summary: string;
-  narrationText: string;
+  standfirst: string;
+  body: string;
   source: string;
-  sourceUrl: string;
-  readTimeMins: number;
   publishedAt: string; // ISO 8601 string
-  accentGradient: [string, string];
+  durationSec: number;
+  sourceUrl?: string;
+  isSearchItem?: boolean;
   score?: number;
+  isPreferred?: boolean;
   saved?: boolean;
+}
+
+export interface GoogleNewsItem {
+  title: string;
+  link: string;
+  source: string;
+  pubDate: string;
 }
 
 export interface UserPreference {
@@ -29,5 +38,4 @@ export interface PlaybackState {
   totalSecs: number;
   playbackRate: 1 | 1.25 | 1.5;
   currentSpokenText?: string;
-  currentWordIndex?: number;
 }

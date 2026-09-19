@@ -24,7 +24,8 @@ export function SearchModal({
   const filtered = articles.filter(
     (a) =>
       a.headline.toLowerCase().includes(query.toLowerCase()) ||
-      a.summary.toLowerCase().includes(query.toLowerCase()) ||
+      (a.standfirst && a.standfirst.toLowerCase().includes(query.toLowerCase())) ||
+      (a.body && a.body.toLowerCase().includes(query.toLowerCase())) ||
       a.source.toLowerCase().includes(query.toLowerCase()) ||
       a.category.toLowerCase().includes(query.toLowerCase())
   );

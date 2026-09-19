@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
       userId = user.id;
     }
   } catch {
-    // Supabase unreachable or unconfigured
+    // Supabase unreachable or session token not present
   }
 
-  // Check demo fallback
+  // Check demo fallback session
   if (!userId) {
     const demoCookie = cookieStore.get('nuzio_demo_user')?.value;
     if (demoCookie) {
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Reject unauthenticated requests per PRD Section 8
+  // Reject unauthenticated requests per PRD: 401
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   if (explicitCategory && explicitCategory !== 'All') {
     preferredCategories = [explicitCategory];
   } else if (!explicitCategory) {
-    // Fetch user preferences from DB or session
+    // Read preferences.categories for the user
     if (isDemo) {
       const demoPrefs = cookieStore.get('nuzio_demo_preferences')?.value;
       if (demoPrefs) {
@@ -70,21 +70,20 @@ export async function GET(request: NextRequest) {
           preferredCategories = data.categories;
         }
       } catch {
-        // Fallback to empty preferences
+        // Fallback if table not ready yet
       }
     }
   }
 
-  // PRD Section 7 & 8:
-  // score(article) = (isPreferredCategory ? 100 : 0) - ageInHours
-  // Resilience: feed falls back to default queue if no preferences are saved yet
+  // Score every article: score = (isPreferredCategory ? 100 : 0) - ageInHours, sorts descending
+  // Returns { preferredCategories, articles: [...articles with isPreferred flag] }
+  // If user has no saved preferences yet, returns everything in recency order
   const ranked = rankArticles(INITIAL_ARTICLES, preferredCategories);
 
   return NextResponse.json({
-    articles: ranked,
     preferredCategories,
+    articles: ranked,
     total: ranked.length,
-    formula: 'score(article) = (isPreferredCategory ? 100 : 0) - ageInHours',
     timestamp: new Date().toISOString(),
   });
 }

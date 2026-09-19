@@ -1,109 +1,94 @@
 import { Article } from './types';
 
-// Curated high-fidelity wire feed fixture tailored for Indian professionals
+// Curated wire feed fixture tailored for Indian professionals
+// Each body is long enough to narrate 35-50 seconds (~85-115 words)
 export const INITIAL_ARTICLES: Article[] = [
   {
     id: 'art-01',
     category: 'AI & Tech',
-    headline: 'Anthropic ships Claude 4.5 with 2M-token memory and native developer tools.',
-    summary: 'Anthropic’s new memory architecture lets Claude retain persistent codebase context across weeks of engineering sprints.',
-    narrationText: 'Anthropic has officially launched Claude 4.5, bringing a breakthrough two million token memory window and native developer tooling. The update allows engineers to mount full multi-repo codebases directly into the reasoning context, radically cutting context switching for engineering teams in Bengaluru and San Francisco.',
+    headline: 'Anthropic ships Claude 4.5 with 2M-token memory and native tools',
+    standfirst: 'Anthropic memory layer lets Claude hold entire enterprise codebases in persistent active reasoning.',
+    body: 'Anthropic has officially rolled out Claude 4.5, introducing a breakthrough two-million-token context window alongside native developer execution capabilities. The architecture allows engineering teams across Bengaluru, Hyderabad, and Silicon Valley to mount complete multi-repository codebases into persistent memory, eliminating repetitive context-loading overhead. Benchmarks show a forty percent reduction in hallucination rates on complex architectural refactoring, marking a notable milestone in enterprise autonomous coding agents.',
     source: 'THE VERGE',
     sourceUrl: 'https://theverge.com',
-    readTimeMins: 3,
-    // Published 1.5 hours ago
-    publishedAt: new Date(Date.now() - 1.5 * 3600 * 1000).toISOString(),
-    accentGradient: ['#7b70d8', '#4c8dff'],
+    publishedAt: new Date(Date.now() - 1.2 * 3600 * 1000).toISOString(), // 1.2h ago
+    durationSec: 42,
   },
   {
     id: 'art-02',
     category: 'Markets',
-    headline: 'RBI holds repo rate at 6.5% as retail inflation eases to four-year low.',
-    summary: 'Governor Shaktikanta Das notes resilient urban consumption and private capex pick-up as MPC unanimously maintains stance.',
-    narrationText: 'The Reserve Bank of India’s Monetary Policy Committee has voted unanimously to keep the benchmark repo rate unchanged at 6.5 percent for the eighth consecutive review. Governor Shaktikanta Das emphasized that cooling headline inflation coupled with healthy Kharif sowing positions India for stable 7.2 percent growth this fiscal year.',
+    headline: 'RBI holds repo rate at 6.5% as retail inflation drops to four-year low',
+    standfirst: 'Monetary Policy Committee votes unanimously to maintain stance amid accelerating capital expenditures.',
+    body: 'The Reserve Bank of India’s Monetary Policy Committee has voted unanimously to keep the benchmark repo rate unchanged at 6.5 percent for the eighth consecutive session. Governor Shaktikanta Das highlighted that headline inflation has cooled toward the central bank’s medium-term four percent target, supported by robust Kharif harvest arrivals. With real gross domestic product growth projected at 7.2 percent for fiscal 2027, the central bank maintains adequate policy headroom while ensuring domestic market liquidity remains firmly balanced.',
     source: 'BLOOMBERG',
     sourceUrl: 'https://bloomberg.com',
-    readTimeMins: 2,
-    // Published 2.2 hours ago
-    publishedAt: new Date(Date.now() - 2.2 * 3600 * 1000).toISOString(),
-    accentGradient: ['#3ecf8e', '#4c8dff'],
+    publishedAt: new Date(Date.now() - 2.1 * 3600 * 1000).toISOString(), // 2.1h ago
+    durationSec: 45,
   },
   {
     id: 'art-03',
     category: 'Startups',
-    headline: 'Zepto closes $350M round led by domestic Indian family offices at $5B valuation.',
-    summary: 'Quick commerce champion accelerates reverse flip to India ahead of planned domestic IPO in Mumbai.',
-    narrationText: 'Mumbai-based quick commerce sensation Zepto has finalized a 350 million dollar financing round anchored entirely by prominent Indian family offices and wealth funds. With valuation crossing five billion dollars, the company is accelerating its domestic relocation to list on the National Stock Exchange early next year.',
+    headline: 'Zepto closes $350M round led by domestic family offices at $5B valuation',
+    standfirst: 'Quick commerce champion accelerates reverse flip to India ahead of domestic IPO on Dalal Street.',
+    body: 'Quick commerce platform Zepto has completed a 350-million-dollar financing round anchored predominantly by Indian domestic family offices and sovereign investment vehicles. The fundraise elevates the Mumbai-based unicorn’s post-money valuation past five billion dollars as it accelerates corporate redomiciliation back to India. Operating cash flows have turned positive across its top forty dark stores, paving the way for a landmark listing on the National Stock Exchange early next year.',
     source: 'TECHCRUNCH',
     sourceUrl: 'https://techcrunch.com',
-    readTimeMins: 3,
-    // Published 3.8 hours ago
-    publishedAt: new Date(Date.now() - 3.8 * 3600 * 1000).toISOString(),
-    accentGradient: ['#6a4cf7', '#9080ff'],
+    publishedAt: new Date(Date.now() - 3.4 * 3600 * 1000).toISOString(), // 3.4h ago
+    durationSec: 39,
   },
   {
     id: 'art-04',
     category: 'Global',
-    headline: 'Federal Reserve minutes indicate growing consensus for systematic rate easing.',
-    summary: 'FOMC policymakers point to balanced employment risks and steady disinflation across housing and services.',
-    narrationText: 'Detailed minutes released from the latest Federal Open Market Committee meeting show policymakers see upside inflation risks moderating steadily. A broad majority of voting members signaled that calibrated interest rate adjustments will be appropriate to preserve momentum in global labor markets.',
+    headline: 'Federal Reserve minutes indicate growing consensus for gradual rate easing',
+    standfirst: 'FOMC policymakers point to balanced employment risks and steady disinflation across housing sectors.',
+    body: 'Detailed minutes from the Federal Open Market Committee’s latest meeting signal that policymakers are preparing a calibrated easing cycle as inflationary pressures across services and housing recede. Committee participants noted that the balance of risks to employment and price stability has shifted favorably, reducing concerns of economic overheating. Global currency markets reacted with steady gains across emerging market sovereign debt, with Indian government bonds attracting sustained foreign portfolio inflows.',
     source: 'FINANCIAL TIMES',
     sourceUrl: 'https://ft.com',
-    readTimeMins: 2,
-    // Published 4.5 hours ago
-    publishedAt: new Date(Date.now() - 4.5 * 3600 * 1000).toISOString(),
-    accentGradient: ['#38d9f0', '#3ecf8e'],
+    publishedAt: new Date(Date.now() - 4.2 * 3600 * 1000).toISOString(), // 4.2h ago
+    durationSec: 43,
   },
   {
     id: 'art-05',
     category: 'Science',
-    headline: 'ISRO unveils timeline for Chandrayaan-4 lunar sample return and Bharatiya Antariksh Station.',
-    summary: 'Indian space agency completes critical docking simulations in Bengaluru for modular space station module 1.',
-    narrationText: 'The Indian Space Research Organisation has unveiled its comprehensive blueprint for Chandrayaan-4, designed to harvest lunar surface samples and perform automated return docking. ISRO chief S. Somanath confirmed that fabrication of the inaugural Bharatiya Antariksh Station core module is tracking ahead of schedule.',
+    headline: 'ISRO finalizes timeline for Chandrayaan-4 sample return and space station core module',
+    standfirst: 'Indian space agency completes critical docking simulations in Bengaluru for orbital laboratory module.',
+    body: 'The Indian Space Research Organisation has approved the complete engineering specifications for the Chandrayaan-4 lunar sample return mission. Ground controllers at the ISRO Telemetry Tracking and Command Network successfully validated autonomous orbital rendezvous algorithms in simulated lunar descent trajectories. Simultaneously, structural fabrication of the inaugural Bharatiya Antariksh Station module has commenced, with maiden low-Earth orbit deployment targeted for late 2028.',
     source: 'REUTERS',
     sourceUrl: 'https://reuters.com',
-    readTimeMins: 4,
-    // Published 6.0 hours ago
-    publishedAt: new Date(Date.now() - 6.0 * 3600 * 1000).toISOString(),
-    accentGradient: ['#4c8dff', '#7b70d8'],
+    publishedAt: new Date(Date.now() - 5.5 * 3600 * 1000).toISOString(), // 5.5h ago
+    durationSec: 44,
   },
   {
     id: 'art-06',
     category: 'AI & Tech',
-    headline: 'Nvidia and Tata Communications deploy massive sovereign AI cloud across India.',
-    summary: 'Over 16,000 GH200 Grace Hopper superchips go live to power Indic foundational language models.',
-    narrationText: 'Nvidia and Tata Communications have jointly commissioned one of Asia’s largest sovereign AI computing clusters, deploying sixteen thousand Grace Hopper superchips across Tier 4 data centers in Mumbai and Hyderabad. The infrastructure will accelerate custom LLMs trained on twenty-two scheduled Indian languages.',
+    headline: 'Tata Communications and Nvidia roll out 16,000 GPU AI supercomputing cluster across India',
+    standfirst: 'Sovereign computing infrastructure goes live to accelerate Indic foundation language models.',
+    body: 'Tata Communications in partnership with Nvidia has commissioned a massive sixteen-thousand GPU artificial intelligence supercluster distributed across data centers in Navi Mumbai and Hyderabad. Equipped with Grace Hopper superchips, the infrastructure offers sovereign computing to Indian research institutions, defense organizations, and tech enterprises. Several homegrown language models trained on twenty-two scheduled Indian languages are already running pilot inference workloads on the cluster.',
     source: 'ECONOMIC TIMES',
     sourceUrl: 'https://economictimes.indiatimes.com',
-    readTimeMins: 3,
-    // Published 7.2 hours ago
-    publishedAt: new Date(Date.now() - 7.2 * 3600 * 1000).toISOString(),
-    accentGradient: ['#6a4cf7', '#3ecf8e'],
+    publishedAt: new Date(Date.now() - 6.8 * 3600 * 1000).toISOString(), // 6.8h ago
+    durationSec: 46,
   },
   {
     id: 'art-07',
     category: 'Markets',
-    headline: 'Nifty 50 registers fresh historic high as foreign institutional inflows surge past $2B.',
-    summary: 'Heavyweight financial, capital goods, and semiconductor stocks drive benchmark index higher.',
-    narrationText: 'Indian equity markets extended their record-breaking rally this morning, with the Nifty 50 leaping past previous all-time highs. Robust domestic mutual fund SIP flows surpassing twenty-five thousand crore rupees monthly continue to provide unprecedented cushion against global market volatility.',
+    headline: 'Nifty 50 surges to fresh high as monthly domestic SIP inflows touch ₹26,000 crore',
+    standfirst: 'Heavyweight financial, semiconductor, and capex equities drive sustained benchmark index momentum.',
+    body: 'Indian equity benchmarks touched unprecedented records today, powered by relentless retail investor participation through systematic investment plans now exceeding twenty-six thousand crore rupees each month. Institutional desks noted broad-based sector participation spanning private lenders, capital goods suppliers, and renewable power infrastructure developers. Market breadth remained decisively positive with midcap indices recording over two gainers for every declining issue.',
     source: 'MINT',
     sourceUrl: 'https://livemint.com',
-    readTimeMins: 2,
-    // Published 8.5 hours ago
-    publishedAt: new Date(Date.now() - 8.5 * 3600 * 1000).toISOString(),
-    accentGradient: ['#38d9f0', '#4c8dff'],
+    publishedAt: new Date(Date.now() - 8.0 * 3600 * 1000).toISOString(), // 8.0h ago
+    durationSec: 38,
   },
   {
     id: 'art-08',
     category: 'Startups',
-    headline: 'Peak XV launches $25M frontier tech incubator for Indian robotics and space startups.',
-    summary: 'Venture firm targets hardware, autonomous robotics, and satellite propulsion founders with deep tech grants.',
-    narrationText: 'Venture capital powerhouse Peak XV Partners has committed twenty-five million dollars to a specialized incubation fund targeting Indian hardware founders. The program provides non-dilutive prototype grants, advanced wind-tunnel test facilities, and rapid access to aerospace certified supply chains.',
+    headline: 'Peak XV launches $25M frontier tech incubator for Indian robotics and space founders',
+    standfirst: 'Venture fund targets hardware prototypes, satellite propulsion, and precision industrial automation.',
+    body: 'Venture capital firm Peak XV Partners has committed twenty-five million dollars to an incubator dedicated to hardware, aerospace propulsion, and robotics startups founded in India. The initiative will grant participating teams up to five hundred thousand dollars in non-dilutive prototype capital alongside direct access to defense test corridors and high-vacuum thermal chambers. The first cohort features eight startups developing autonomous agricultural drones and small-satellite laser communications.',
     source: 'INC42',
     sourceUrl: 'https://inc42.com',
-    readTimeMins: 2,
-    // Published 9.1 hours ago
-    publishedAt: new Date(Date.now() - 9.1 * 3600 * 1000).toISOString(),
-    accentGradient: ['#7b70d8', '#38d9f0'],
+    publishedAt: new Date(Date.now() - 9.4 * 3600 * 1000).toISOString(), // 9.4h ago
+    durationSec: 41,
   },
 ];
