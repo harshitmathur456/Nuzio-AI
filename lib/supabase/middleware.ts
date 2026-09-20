@@ -63,7 +63,9 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Also check demo user cookie fallback
-  const demoCookie = request.cookies.get('nuzio_demo_user')?.value;
+  const demoCookie =
+    request.cookies.get('nuzio_demo_user')?.value ||
+    request.cookies.get('nuzio_demo_preferences')?.value;
   const isAuthenticated = Boolean(user || demoCookie);
 
   const pathname = request.nextUrl.pathname;

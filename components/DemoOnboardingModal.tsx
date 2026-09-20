@@ -183,7 +183,7 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
     }
   };
 
-  // Complete onboarding without blocking or freezing the UI
+  // Complete onboarding and transition to the Brief Playing screen
   const handleCompleteOnboarding = async () => {
     setLoading(true);
     setErrorMsg(null);
@@ -197,9 +197,43 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
     });
     const uniqueCategories = Array.from(new Set(primaryCategories));
 
+    // 1. Immediately set auth and preferences cookies synchronously in the browser
+    const demoUser = {
+      id: 'demo-user-' + Math.random().toString(36).substring(2, 9),
+      name: fullName,
+      email,
+      profession,
+      voice,
+      briefLength,
+      deliveryTime,
+      language,
+      location: locationText,
+      created_at: new Date().toISOString(),
+    };
+
+    if (typeof document !== 'undefined') {
+      document.cookie = `nuzio_demo_user=${encodeURIComponent(
+        JSON.stringify(demoUser)
+      )}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+
+      document.cookie = `nuzio_demo_preferences=${encodeURIComponent(
+        JSON.stringify({
+          categories: uniqueCategories,
+          full_name: fullName,
+          profession,
+          voice,
+          brief_length: briefLength,
+          delivery_time: deliveryTime,
+          language,
+          location: locationText,
+          notifications_enabled: notificationsEnabled,
+        })
+      )}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+    }
+
     try {
-      // Fire-and-forget / non-blocking save to backend with timeout
-      fetch('/api/auth/demo', {
+      // 2. Persist to backend and Supabase
+      await fetch('/api/auth/demo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -215,16 +249,17 @@ export function DemoOnboardingModal({ isOpen, onClose }: DemoOnboardingModalProp
           location: locationText,
           notificationsEnabled,
         }),
-      }).catch((e) => console.warn('Background save note:', e));
+      });
+    } catch (err) {
+      console.warn('Backend save note:', err);
+    }
 
-      // Close modal and redirect directly to news
-      onClose();
+    // 3. Close modal and perform hard navigation to /news
+    onClose();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/news';
+    } else {
       router.push('/news');
-      router.refresh();
-    } catch {
-      onClose();
-      router.push('/news');
-      router.refresh();
     }
   };
 
