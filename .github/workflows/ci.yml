@@ -21,10 +21,11 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci || npm install
 
       - name: Run Build
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-project.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://bqqbsvuokbyscktmlbvn.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_l5bz_zE_StY8ramvibMaCQ_ElqLtfIl' }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres.bqqbsvuokbyscktmlbvn:cruelmathur%40456@aws-0-ap-south-1.pooler.supabase.com:6543/postgres' }}
